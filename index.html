@@ -304,6 +304,8 @@
         let s = n.getSeconds().toString().padStart(2, "0");
         chart.data.labels.push(`${h}:${m}:${s}`);
         chart.data.datasets[0].data.push(data);
+        if (chart.data.datasets[0].data.length > 100)
+          chart.data.datasets[0].data.shift();
         chart.update();
       }
 
