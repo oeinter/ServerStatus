@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oeinter Status</title>
+    <link rel="stylesheet" href="./index.css" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+  </head>
+  <body>
+    <div class="lsideMenu">
+      <div class="item" id="home">
+        <span class="material-symbols-outlined"> home </span>
+        <span>Home</span>
+      </div>
+      <div class="item" id="cpuU">
+        <span class="material-symbols-outlined"> memory </span>
+        <span>CPU Usage</span>
+      </div>
+      <div class="item" id="cpuT">
+        <span class="material-symbols-outlined"> device_thermostat </span>
+        <span>CPU TEMP</span>
+      </div>
+      <div class="item" id="ndn">
+        <span class="material-symbols-outlined"> download </span>
+        <span>NET DOWN</span>
+      </div>
+      <div class="item" id="nup">
+        <span class="material-symbols-outlined"> upload </span>
+        <span>NET UP</span>
+      </div>
+      <div class="item" id="meu">
+        <span class="material-symbols-outlined"> storage </span>
+        <span>MEM Usage</span>
+      </div>
+    </div>
+    <div id="bg"></div>
+    <div id="close">
+      <span class="material-symbols-outlined"> arrow_back_ios </span>
+    </div>
+    <div class="page" id="page_home">
+      <div class="progresses">
+        <div class="circle-progress" id="cpu_use">
+          <div>
+            <div>
+              <span>0%</span>
+            </div>
+            <label>CPU Usage</label>
+          </div>
+        </div>
+        <div class="circle-progress" id="cpu_temp">
+          <div>
+            <div>
+              <span>0'C</span>
+            </div>
+            <label>CPU Temperature</label>
+          </div>
+        </div>
+        <div class="circle-progress" id="net_down">
+          <div>
+            <div>
+              <span>0KB</span>
+            </div>
+            <label>Network Down</label>
+          </div>
+        </div>
+        <div class="circle-progress" id="net_up">
+          <div>
+            <div>
+              <span>0KB</span>
+            </div>
+            <label>Network Up</label>
+          </div>
+        </div>
+        <div class="circle-progress" id="mem_use">
+          <div>
+            <div>
+              <span>0%</span>
+            </div>
+            <label>Memory Usage</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page chartPage" id="page_cpuT">
+      <div>
+        <h1>CPU Temperature</h1>
+        <div>
+          <canvas id="cpu_chart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="page chartPage" id="page_cpuU">
+      <div>
+        <h1>CPU Usage</h1>
+        <div>
+          <canvas id="cpuu_chart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="page chartPage" id="page_ndn">
+      <div>
+        <h1>Network / Download</h1>
+        <div>
+          <canvas id="ndn_chart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="page chartPage" id="page_nup">
+      <div>
+        <h1>Network / Upload</h1>
+        <div>
+          <canvas id="nup_chart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="page chartPage" id="page_meu">
+      <div>
+        <h1>Memory Usage</h1>
+        <div>
+          <canvas id="meu_chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket = io();
+      let animationCaches = {};
+      function animateBackground(querySelector, to, unit, maxV) {
+        const MS = 200;
+        if (!animationCaches[querySelector])
+          animationCaches[querySelector] = {};
+
+        const now = new Date().getTime();
+        let startNewInterval = false;
+        if (
+          !animationCaches[querySelector]["start"] ||
+          animationCaches[querySelector]["start"] + MS + 10 < now
+        )
+          startNewInterval = true;
+
+        if (startNewInterval)
+          animationCaches[querySelector] = {
+            start: new Date().getTime(),
+            from: animationCaches[querySelector]["now"] || 0,
+            to: to,
+            now: animationCaches[querySelector]["now"] || 0,
+            maxVal: maxV,
+          };
+        else
+          animationCaches[querySelector] = {
+            start: new Date().getTime(),
+            from: animationCaches[querySelector]["now"],
+            to: to,
+            now: animationCaches[querySelector]["now"],
+            maxVal: maxV,
+          };
+
+        if (!startNewInterval) return;
+        const inter = setInterval(() => {
+          const now = new Date().getTime();
+          const start = animationCaches[querySelector]["start"];
+          const from = animationCaches[querySelector]["from"];
+          const to = animationCaches[querySelector]["to"];
+          const maxVal = animationCaches[querySelector]["maxVal"];
+          if (now - start > 200) {
+            clearInterval(inter);
+          }
+
+          let aniPercentage = Math.min((now - start) / MS, 1);
+          let aniData = (to - from) * aniPercentage + from;
+          animationCaches[querySelector]["now"] = aniData;
+          document.querySelector(
+            querySelector
+          ).style.background = `conic-gradient(#7d2ae8 ${
+            (aniData / maxVal) * 360
+          }deg, #ededed 0deg)`;
+          document.querySelector(querySelector + " > span").innerText =
+            Math.round(aniData).toString() + unit;
+        }, 10);
+      }
+
+      function fetchProgress(percent, id, unit, maxV = 100) {
+        animateBackground(`#${id} > div > div`, percent, unit, maxV);
+      }
+
+      let url = {
+        "/": "home",
+        "/cpu": "cpuT",
+        "/cpuu": "cpuU",
+        "/ndn": "ndn",
+        "/nup": "nup",
+        "/meu": "meu",
+      };
+      let urlk = Object.keys(url);
+
+      function toURL(url) {
+        if (location.pathname == url) return;
+        history.pushState({ data: "pushState" }, null, url);
+      }
+
+      function fetchURL() {
+        let pname = location.pathname;
+
+        document.querySelectorAll(".page.shown").forEach((v) => {
+          v.classList.remove("shown");
+        });
+        document.querySelectorAll(".item").forEach((v) => {
+          if (v.classList.contains("selected")) v.classList.remove("selected");
+          if (v.id == url[pname]) {
+            v.classList.add("selected");
+
+            document.querySelector("#page_" + v.id)?.classList?.add("shown");
+          }
+        });
+
+        if (pname == "/")
+          document.querySelector("#close:not(.notO)")?.classList?.add("notO");
+        else document.querySelector("#close.notO")?.classList?.remove("notO");
+      }
+
+      fetchURL();
+
+      document.querySelectorAll(".item").forEach((v) => {
+        v.addEventListener("click", () => {
+          toURL(urlk.filter((x) => url[x] == v.id)[0]);
+          fetchURL();
+        });
+      });
+
+      let charts = {
+        cpuT: new Chart(document.getElementById("cpu_chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "'C",
+                data: [],
+              },
+            ],
+          },
+        }),
+        cpuU: new Chart(document.getElementById("cpuu_chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Percent",
+                data: [],
+              },
+            ],
+          },
+        }),
+        nup: new Chart(document.getElementById("nup_chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "KB/s",
+                data: [],
+              },
+            ],
+          },
+        }),
+        ndn: new Chart(document.getElementById("ndn_chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "KB/s",
+                data: [],
+              },
+            ],
+          },
+        }),
+        meu: new Chart(document.getElementById("meu_chart"), {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Percent",
+                data: [],
+              },
+            ],
+          },
+        }),
+      };
+
+      function addData(chart, data) {
+        let n = new Date();
+        let h = n.getHours().toString().padStart(2, "0");
+        let m = n.getMinutes().toString().padStart(2, "0");
+        let s = n.getSeconds().toString().padStart(2, "0");
+        chart.data.labels.push(`${h}:${m}:${s}`);
+        chart.data.datasets[0].data.push(data);
+        chart.update();
+      }
+
+      function removeData(chart) {
+        chart.data.labels.shift();
+        chart.data.datasets.shift();
+        chart.update();
+      }
+
+      function createLinkFunction(url) {
+        return () => {
+          toURL(url);
+          fetchURL();
+        };
+      }
+
+      let aLinks = {
+        "#cpu_use": createLinkFunction("/cpuu"),
+        "#cpu_temp": createLinkFunction("/cpu"),
+        "#net_down": createLinkFunction("/ndn"),
+        "#net_up": createLinkFunction("/nup"),
+        "#mem_use": createLinkFunction("/meu"),
+      };
+
+      Object.keys(aLinks).forEach((v) => {
+        document.querySelector(v).addEventListener("click", aLinks[v]);
+      });
+
+      document.getElementById("close").addEventListener("click", () => {
+        toURL("/");
+        fetchURL();
+      });
+
+      socket.on("CPU::TEMP", function (msg) {
+        fetchProgress(msg, "cpu_temp", "'C");
+        addData(charts["cpuT"], msg);
+      });
+
+      socket.on("MEM::USAGE", function (msg) {
+        fetchProgress(msg, "mem_use", "%");
+        addData(charts["meu"], msg);
+      });
+
+      socket.on("CPU::USAGE", function (msg) {
+        fetchProgress(msg, "cpu_use", "%");
+        addData(charts["cpuU"], msg);
+      });
+
+      socket.on("NET::DOWN", function (msg) {
+        addData(charts["ndn"], msg);
+        let unit = "KB";
+        if (msg >= 1024) {
+          msg = Math.round(msg / 1024);
+          unit = "MB";
+        }
+        if (msg >= 1024) {
+          msg = Math.round(msg / 1024);
+          unit = "GB";
+        }
+        fetchProgress(msg, "net_down", unit, 1024);
+      });
+
+      socket.on("NET::UP", function (msg) {
+        addData(charts["nup"], msg);
+        let unit = "KB";
+        if (msg >= 1024) {
+          msg = Math.round(msg / 1024);
+          unit = "MB";
+        }
+        if (msg >= 1024) {
+          msg = Math.round(msg / 1024);
+          unit = "GB";
+        }
+        fetchProgress(msg, "net_up", unit, 1024);
+      });
+    </script>
+  </body>
+</html>
