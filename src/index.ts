@@ -6,6 +6,8 @@ import http from "http";
 import { Server } from "socket.io";
 import path from "path";
 
+import * as osxTEMP from "osx-temperature-sensor";
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -47,7 +49,13 @@ io.on("connection", (socket) => {
 });
 
 const sendCPU = async () => {
-  let dt = ((await toAsync(cpuTemperature)) as any)[0]["main"];
+  let dt = 0;
+  if(process.platform == "darwin") {
+    dt = osxTEMP.cpuTemperature()["main"];
+  } else {
+    let dtx = (await toAsync(cpuTemperature) as any)[0];
+    dt = dtx["main"];
+  }
 
   datas["CPU::TEMP"] = dt;
   io.emit("CPU::TEMP", dt);
